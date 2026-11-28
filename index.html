@@ -474,16 +474,39 @@ function qrMatrix(text){
   var raf = 0;
   function redraw(){ if (raf) return; raf = requestAnimationFrame(function(){ raf = 0; if (cur) draw(vctx); }); }
 
+  var hiddenV = null;
   function useVideo(url){
-    var v = document.createElement("video");
-    v.playsInline = true; v.setAttribute("playsinline", ""); v.preload = "auto"; v.muted = true; v.crossOrigin = "anonymous";
-    v.onloadedmetadata = function(){
-      if (v.duration > MAXSEC + 0.5) { setErr("Video dài " + Math.round(v.duration) + " giây. Anh chị chọn video từ " + MAXSEC + " giây trở xuống."); return; }
-      v.currentTime = Math.min(1, v.duration / 2);
-    };
-    v.onseeked = function(){ if (!recording && photo !== v){ photo = v; ox = oy = 0; z = 1; zoomEl.value = 1; zoomEl.disabled = false; setErr(""); } redraw(); };
-    v.onerror = function(){ setErr("Không đọc được video này. Anh chị thử video MP4 quay bằng điện thoại."); };
+    if (hiddenV && hiddenV.parentNode) hiddenV.parentNode.removeChild(hiddenV);
+    var v = document.createElement("video"); hiddenV = v;
+    v.muted = true; v.defaultMuted = true; v.playsInline = true; v.preload = "auto";
+    v.setAttribute("playsinline", ""); v.setAttribute("webkit-playsinline", ""); v.setAttribute("muted", "");
+    v.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none";
+    document.body.appendChild(v);
+    var ready = false, bad = false;
+    function show(){
+      if (ready || bad || v.readyState < 2) return;
+      ready = true; photo = v; ox = oy = 0; z = 1; zoomEl.value = 1; zoomEl.disabled = false; setErr(""); el("prog").style.display = "none"; redraw();
+    }
+    v.addEventListener("loadedmetadata", function(){
+      if (isFinite(v.duration) && v.duration > MAXSEC + 0.5) { bad = true; setErr("Video dài " + Math.round(v.duration) + " giây. Anh chị chọn video từ " + MAXSEC + " giây trở xuống."); return; }
+      try { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); } catch (e) {}
+    });
+    v.addEventListener("loadeddata", show);
+    v.addEventListener("canplay", show);
+    v.addEventListener("seeked", function(){ show(); if (ready && !recording) redraw(); });
+    v.addEventListener("error", function(){
+      bad = true; el("prog").style.display = "none";
+      setErr("Máy không đọc được video này. Nếu quay bằng iPhone, anh chị mở trang bằng Safari, hoặc chỉnh iPhone: Cài đặt > Camera > Định dạng > Tương thích nhất, rồi quay lại.");
+    });
+    el("prog").style.display = "block"; el("prog").textContent = "Đang mở video...";
+    setTimeout(function(){
+      if (ready || bad) return;
+      var p = v.play();
+      if (p && p.then) p.then(function(){ v.pause(); show(); }).catch(function(){ show(); });
+      setTimeout(function(){ if (!ready && !bad){ el("prog").style.display = "none"; setErr("Video mở chậm hoặc máy chưa đọc được. Anh chị thử chọn lại video, hoặc dùng video ngắn hơn."); } }, 8000);
+    }, 2500);
     v.src = url;
+    try { v.load(); } catch (e) {}
   }
   window.__useVideo = useVideo;
   el("pick").addEventListener("click", function(){ el("fileInput").click(); });
@@ -569,14 +592,20 @@ function qrMatrix(text){
       if (src.requestVideoFrameCallback) src.requestVideoFrameCallback(frame); else requestAnimationFrame(frame);
     };
     src.onended = function(){ setTimeout(function(){ if (rec.state !== "inactive") rec.stop(); }, 150); };
-    src.pause(); src.currentTime = 0; src.muted = false;
-    var go = function(){
-      src.removeEventListener("seeked", go);
-      draw(ctx2); rec.start(500);
-      var p = src.play(); if (p && p.catch) p.catch(function(){ recording = false; el("make").disabled = false; try { rec.stop(); } catch(e){} setErr("Không phát được video. Anh chị bấm Tạo video lại."); });
-      frame();
-    };
-    src.addEventListener("seeked", go);
+    src.pause(); src.muted = false;
+    try { src.currentTime = 0; } catch (e) {}
+    var started = false;
+    function begin(){
+      if (started) return; started = true;
+      draw(ctx2); rec.start(500); frame();
+    }
+    src.addEventListener("playing", begin, {once: true});
+    var p = src.play();
+    if (p && p.catch) p.catch(function(){
+      recording = false; el("make").disabled = false; el("prog").style.display = "none";
+      try { if (rec.state !== "inactive") rec.stop(); } catch(e){}
+      setErr("Máy chưa cho phát video. Anh chị bấm Tạo video lại một lần nữa.");
+    });
   }
 
   el("make").addEventListener("click", function(){
