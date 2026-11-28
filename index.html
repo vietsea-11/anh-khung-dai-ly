@@ -347,7 +347,7 @@ function qrMatrix(text){
     ctx.font = "bold " + numSize + "px Arial, Helvetica, sans-serif";
     var nw = 0; hl.forEach(function(t){ nw = Math.max(nw, ctx.measureText(t).width); });
     var rightX = W - 40, left = rightX - nw;
-    var TY = fmt === "9x16" ? 110 : 0, BY = fmt === "9x16" ? 300 : 0;
+    var TY = 0, BY = 0; // khung video giống ảnh: logo, hotline cách viền như ảnh; dải chân sát đáy
     var blockH = 25 + n * lineGap, top = 36 + TY;
     var iconX = left - 20 - isz;
 
