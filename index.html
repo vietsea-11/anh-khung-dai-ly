@@ -305,30 +305,54 @@ function qrMatrix(text){
     }
     ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
 
-    // nền sáng mờ ở đầu ảnh để logo và hotline luôn đọc được
-    var g = ctx.createLinearGradient(0, 0, 0, 200);
-    g.addColorStop(0, "rgba(255,255,255,0.62)"); g.addColorStop(0.55, "rgba(255,255,255,0.42)"); g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 200);
+    // kính mờ riêng sau logo và sau hotline: làm nhòe ảnh, phủ trắng nhẹ, mép tan vào ảnh
+    var canFilter = "filter" in ctx;
+    function frost(x, y, w, h){
+      if (!photo) return;
+      var pad = 36, cw = Math.round(w + pad*2), ch = Math.round(h + pad*2), cx0 = Math.round(x - pad), cy0 = Math.round(y - pad);
+      var c = document.createElement("canvas"); c.width = cw; c.height = ch;
+      var g2 = c.getContext("2d"), s2 = baseScale() * z;
+      if (canFilter) g2.filter = "blur(12px)";
+      g2.drawImage(photo, W/2 + ox - photo.width*s2/2 - cx0, H/2 + oy - photo.height*s2/2 - cy0, photo.width*s2, photo.height*s2);
+      g2.filter = "none";
+      g2.fillStyle = "rgba(255,255,255,0.58)"; g2.fillRect(0, 0, cw, ch);
+      var m = document.createElement("canvas"); m.width = cw; m.height = ch;
+      var mg = m.getContext("2d");
+      if (canFilter) mg.filter = "blur(14px)";
+      mg.fillStyle = "#000"; rr(mg, pad, pad, w, h, 24); mg.fill();
+      g2.globalCompositeOperation = "destination-in"; g2.drawImage(m, 0, 0);
+      ctx.drawImage(c, cx0, cy0);
+    }
 
-    // logo đại lý
-    if (curImgs.logo){ var ar = curImgs.logo.width / curImgs.logo.height, lw = Math.min(372, 150 * ar), lh = lw / ar; ctx.drawImage(curImgs.logo, 40, 30, lw, lh); }
+    // vị trí logo (to hơn 15%)
+    var lw = 0, lh = 0;
+    if (curImgs.logo){ var ar = curImgs.logo.width / curImgs.logo.height; lw = Math.min(428, 172 * ar); lh = lw / ar; }
 
-    // hotline
+    // vị trí hotline (to hơn 15%)
     var hl = d.hotlines, n = hl.length;
-    var numSize = 31, lineGap = 38;
+    var numSize = 36, lineGap = 44, labelSize = 17, isz = 83;
     ctx.font = "bold " + numSize + "px Arial, Helvetica, sans-serif";
     var nw = 0; hl.forEach(function(t){ nw = Math.max(nw, ctx.measureText(t).width); });
     var rightX = W - 40, left = rightX - nw;
-    var blockH = 22 + n * lineGap, top = 36;
-    ctx.fillStyle = GREEN; ctx.font = "bold 15px Arial, Helvetica, sans-serif";
+    var blockH = 25 + n * lineGap, top = 36;
+    var iconX = left - 20 - isz;
+
+    if (lw) frost(40 - 16, 30 - 12, lw + 32, lh + 24);
+    frost(iconX - 18, top - 16, rightX - iconX + 36, blockH + 30);
+
+    // logo đại lý
+    if (curImgs.logo) ctx.drawImage(curImgs.logo, 40, 30, lw, lh);
+
+    // hotline
+    ctx.fillStyle = GREEN; ctx.font = "bold " + labelSize + "px Arial, Helvetica, sans-serif";
     if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
-    ctx.fillText("HOTLINE", left, top + 14);
+    ctx.fillText("HOTLINE", left, top + 16);
     var lw2 = ctx.measureText("HOTLINE").width;
     if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
-    ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(left + lw2 + 12, top + 9); ctx.lineTo(rightX, top + 9); ctx.stroke();
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(left + lw2 + 12, top + 10); ctx.lineTo(rightX, top + 10); ctx.stroke();
     ctx.fillStyle = GREEN; ctx.font = "bold " + numSize + "px Arial, Helvetica, sans-serif";
-    hl.forEach(function(t, i){ ctx.fillText(t, left, top + 14 + 38 + i * lineGap - 6); });
-    if (curImgs.icon){ var isz = 72, iy = top + blockH/2 - isz/2 + 2; ctx.drawImage(curImgs.icon, left - 18 - isz, iy, isz, isz); }
+    hl.forEach(function(t, i){ ctx.fillText(t, left, top + 16 + lineGap + i * lineGap - 4); });
+    if (curImgs.icon){ var iy = top + blockH/2 - isz/2 + 2; ctx.drawImage(curImgs.icon, iconX, iy, isz, isz); }
 
     if (d.branches && d.branches.length){
       // dải chân ảnh
